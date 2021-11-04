@@ -1,6 +1,5 @@
 const { Client } = require("pg"); // imports the pg module
 
-// supply the db name and location of the database
 const client = new Client("postgres://localhost:5432/juicebox-dev");
 
 /**
@@ -13,9 +12,9 @@ async function createUser({ username, password, name, location }) {
       rows: [user],
     } = await client.query(
       `
-    INSERT INTO users(username, password)
-    VALUES ($1, $2)
-    ON CONFLICT (username) DO NOTHING 
+      INSERT INTO users(username, password, name, location) 
+      VALUES($1, $2, $3, $4) 
+      ON CONFLICT (username) DO NOTHING 
       RETURNING *;
     `,
       [username, password, name, location]
@@ -43,10 +42,10 @@ async function updateUser(id, fields = {}) {
       rows: [user],
     } = await client.query(
       `
-    UPDATE users
-    SET ${setString}
-    WHERE id=${id}
-    RETURNING *;
+      UPDATE users
+      SET ${setString}
+      WHERE id=${id}
+      RETURNING *;
     `,
       Object.values(fields)
     );
@@ -59,11 +58,10 @@ async function updateUser(id, fields = {}) {
 
 async function getAllUsers() {
   try {
-    const { rows } = await client.query(
-      `SELECT id, username, name, location, active 
-    FROM users;
-  `
-    );
+    const { rows } = await client.query(`
+      SELECT id, username, name, location, active 
+      FROM users;
+    `);
 
     return rows;
   } catch (error) {
@@ -76,7 +74,7 @@ async function getUserById(userId) {
     const {
       rows: [user],
     } = await client.query(`
-    SELECT id, username, name, location, active
+      SELECT id, username, name, location, active
       FROM users
       WHERE id=${userId}
     `);
@@ -103,9 +101,9 @@ async function createPost({ authorId, title, content, tags = [] }) {
       rows: [post],
     } = await client.query(
       `
-    INSERT INTO posts("authorId", title, content) 
-    VALUES($1, $2, $3)
-    RETURNING *;
+      INSERT INTO posts("authorId", title, content) 
+      VALUES($1, $2, $3)
+      RETURNING *;
     `,
       [authorId, title, content]
     );
@@ -133,7 +131,7 @@ async function updatePost(postId, fields = {}) {
     if (setString.length > 0) {
       await client.query(
         `
-      UPDATE posts
+        UPDATE posts
         SET ${setString}
         WHERE id=${postId}
         RETURNING *;
@@ -149,12 +147,12 @@ async function updatePost(postId, fields = {}) {
 
     // make any new tags that need to be made
     const tagList = await createTags(tags);
-    const tagListIdString = tagList.map((tag) => `&{ tag.id }`).join(", ");
+    const tagListIdString = tagList.map((tag) => `${tag.id}`).join(", ");
 
-    // delete any post_tags from the database which arent in that tagList
+    // delete any post_tags from the database which aren't in that tagList
     await client.query(
       `
-    DELETE FROM post_tags
+      DELETE FROM post_tags
       WHERE "tagId"
       NOT IN (${tagListIdString})
       AND "postId"=$1;
@@ -174,7 +172,7 @@ async function updatePost(postId, fields = {}) {
 async function getAllPosts() {
   try {
     const { rows: postIds } = await client.query(`
-    SELECT id
+      SELECT id
       FROM posts;
     `);
 
@@ -194,7 +192,7 @@ async function getPostById(postId) {
       rows: [post],
     } = await client.query(
       `
-    SELECT *
+      SELECT *
       FROM posts
       WHERE id=$1;
     `,
@@ -203,7 +201,7 @@ async function getPostById(postId) {
 
     const { rows: tags } = await client.query(
       `
-    SELECT tags.*
+      SELECT tags.*
       FROM tags
       JOIN post_tags ON tags.id=post_tags."tagId"
       WHERE post_tags."postId"=$1;
@@ -215,7 +213,7 @@ async function getPostById(postId) {
       rows: [author],
     } = await client.query(
       `
-    SELECT id, username, name, location
+      SELECT id, username, name, location
       FROM users
       WHERE id=$1;
     `,
@@ -236,7 +234,7 @@ async function getPostById(postId) {
 async function getPostsByUser(userId) {
   try {
     const { rows: postIds } = await client.query(`
-    SELECT id 
+      SELECT id 
       FROM posts 
       WHERE "authorId"=${userId};
     `);
@@ -255,11 +253,11 @@ async function getPostsByTagName(tagName) {
   try {
     const { rows: postIds } = await client.query(
       `
-    SELECT posts.id
-    FROM posts
-    JOIN post_tags ON posts.id=post_tags."postId"
-    JOIN tags ON tags.id=post_tags."tagId"
-    WHERE tags.name=$1;
+      SELECT posts.id
+      FROM posts
+      JOIN post_tags ON posts.id=post_tags."postId"
+      JOIN tags ON tags.id=post_tags."tagId"
+      WHERE tags.name=$1;
     `,
       [tagName]
     );
@@ -281,7 +279,7 @@ async function createTags(tagList) {
 
   const valuesStringInsert = tagList
     .map((_, index) => `$${index + 1}`)
-    .join(", ");
+    .join("), (");
 
   const valuesStringSelect = tagList
     .map((_, index) => `$${index + 1}`)
@@ -291,9 +289,19 @@ async function createTags(tagList) {
     // insert all, ignoring duplicates
     await client.query(
       `
-    INSERT INTO tags(name)
+      INSERT INTO tags(name)
       VALUES (${valuesStringInsert})
       ON CONFLICT (name) DO NOTHING;
+    `,
+      tagList
+    );
+
+    // grab all and return
+    const { rows } = await client.query(
+      `
+      SELECT * FROM tags
+      WHERE name
+      IN (${valuesStringSelect});
     `,
       tagList
     );
@@ -308,7 +316,7 @@ async function createPostTag(postId, tagId) {
   try {
     await client.query(
       `
-    INSERT INTO post_tags("postId", "tagId")
+      INSERT INTO post_tags("postId", "tagId")
       VALUES ($1, $2)
       ON CONFLICT ("postId", "tagId") DO NOTHING;
     `,
@@ -336,8 +344,8 @@ async function addTagsToPost(postId, tagList) {
 async function getAllTags() {
   try {
     const { rows } = await client.query(`
-    SELECT * 
-    FROM tags;
+      SELECT * 
+      FROM tags;
     `);
 
     return { rows };
@@ -346,7 +354,6 @@ async function getAllTags() {
   }
 }
 
-// here, we're exporting them
 module.exports = {
   client,
   createUser,

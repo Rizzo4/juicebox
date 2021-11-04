@@ -1,6 +1,3 @@
-// inside db/seed.js
-
-// grab our client with destructuring from the export in index.js
 const {
   client,
   createUser,
@@ -14,12 +11,11 @@ const {
   getPostsByTagName,
 } = require("./index");
 
-// this function should call a query which drops all tables from our database
 async function dropTables() {
   try {
     console.log("Starting to drop tables...");
 
-    // it is important to drop tables in correct order
+    // have to make sure to drop in correct order
     await client.query(`
       DROP TABLE IF EXISTS post_tags;
       DROP TABLE IF EXISTS tags;
@@ -39,43 +35,42 @@ async function createTables() {
     console.log("Starting to build tables...");
 
     await client.query(`
-    CREATE TABLE users (
-      id SERIAL PRIMARY KEY,
-      username varchar(255) UNIQUE NOT NULL,
-      password varchar(255) NOT NULL,
-      name varchar(255) NOT NULL,
-      location varchar(255) NOT NULL,
-      active boolean DEFAULT true
-    );
+      CREATE TABLE users (
+        id SERIAL PRIMARY KEY,
+        username varchar(255) UNIQUE NOT NULL,
+        password varchar(255) NOT NULL,
+        name varchar(255) NOT NULL,
+        location varchar(255) NOT NULL,
+        active boolean DEFAULT true
+      );
 
-    CREATE TABLE posts (
-      id SERIAL PRIMARY KEY,
-      "authorId" INTEGER REFERENCES users(id),
-      title varchar(255) NOT NULL,
-      content TEXT NOT NULL,
-      active BOOLEAN DEFAULT true
-    );
+      CREATE TABLE posts (
+        id SERIAL PRIMARY KEY,
+        "authorId" INTEGER REFERENCES users(id),
+        title varchar(255) NOT NULL,
+        content TEXT NOT NULL,
+        active BOOLEAN DEFAULT true
+      );
 
-    CREATE TABLE tags (
-      id SERIAL PRIMARY KEY,
-      name varchar(255) UNIQUE NOT NULL
-    );
+      CREATE TABLE tags (
+        id SERIAL PRIMARY KEY,
+        name varchar(255) UNIQUE NOT NULL
+      );
 
-    CREATE TABLE post_tags (
-      "postId" INTEGER REFERENCES posts(id),
-      "tagId" INTEGER REFERENCES tags(id),
-      UNIQUE ("postId", "tagId")
-    );
+      CREATE TABLE post_tags (
+        "postId" INTEGER REFERENCES posts(id),
+        "tagId" INTEGER REFERENCES tags(id),
+        UNIQUE ("postId", "tagId")
+      );
     `);
 
     console.log("Finished building tables!");
   } catch (error) {
     console.error("Error building tables!");
-    throw error; // we pass the error up to the function that calls createTables
+    throw error;
   }
 }
 
-// new function, should attempt to create a few users
 async function createInitialUsers() {
   try {
     console.log("Starting to create users...");
@@ -199,7 +194,7 @@ async function testDB() {
 
     console.log("Finished database tests!");
   } catch (error) {
-    console.error("Error during testDB");
+    console.log("Error during testDB");
     throw error;
   }
 }
